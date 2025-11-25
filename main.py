@@ -89,17 +89,36 @@ for name, model in models.items():
 results_df = pd.DataFrame(results, columns=["Model", "MAE", "RMSE", "R2"])
 results_df.to_csv(os.path.join(output_dir, "model_metrics.csv"), index=False)
 
+best_model = models["XGBoost"]
+best_preds = best_model.predict(X_test)
+
+plt.figure(figsize=(8,6))
+plt.scatter(y_test, best_preds, alpha=0.5, label="Предсказания")
+plt.plot([y_test.min(), y_test.max()],
+         [y_test.min(), y_test.max()],
+         'r--', label="Идеальная линия")  # линия y = x
+
+plt.xlabel("Реальная цена")
+plt.ylabel("Предсказанная цена")
+plt.title("Реальная vs Предсказанная цена (XGBoost)")
+plt.legend()
+
+plt.savefig(os.path.join(output_dir, "real_vs_pred.png"))
+plt.close()
+
 # сохраняем график зависимости цены от года выпуска
 plt.figure(figsize=(8,5))
-sns.scatterplot(data=df, x="year", y="price", alpha=0.5)
+sns.scatterplot(data=df, x="year", y="price", alpha=0.5, label="Данные")
 plt.title("Зависимость цены от года выпуска")
+plt.legend()
 plt.savefig(os.path.join(output_dir, "price_vs_year.png"))
 plt.close()
 
 # сохраняем график зависимости цены от пробега
 plt.figure(figsize=(8,5))
-sns.scatterplot(data=df, x="mileage", y="price", alpha=0.5)
+sns.scatterplot(data=df, x="mileage", y="price", alpha=0.5, label="Данные")
 plt.title("Зависимость цены от пробега")
+plt.legend()
 plt.savefig(os.path.join(output_dir, "price_vs_mileage.png"))
 plt.close()
 
@@ -107,3 +126,45 @@ plt.close()
 df_encoded.to_csv(os.path.join(output_dir, "processed_data.csv"), index=False)
 
 print("Готово! Все файлы сохранены в:", output_dir)
+
+rf_model = models["RandomForest"]
+rf_importances = rf_model.feature_importances_
+
+rf_importances_series = pd.Series(rf_importances, index=X.columns)
+rf_top10 = rf_importances_series.sort_values(ascending=False).head(10)
+
+plt.figure(figsize=(8, 6))
+sns.barplot(x=rf_top10.values, y=rf_top10.index)
+plt.xlabel("Важность признака")
+plt.ylabel("Признак")
+plt.title("Top-10 важных признаков (Random Forest)")
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, "rf_feature_importance_top10.png"))
+plt.close()
+
+xgb_model = models["XGBoost"]
+xgb_importances = xgb_model.feature_importances_
+
+xgb_importances_series = pd.Series(xgb_importances, index=X.columns)
+xgb_top10 = xgb_importances_series.sort_values(ascending=False).head(10)
+
+plt.figure(figsize=(8, 6))
+sns.barplot(x=xgb_top10.values, y=xgb_top10.index)
+plt.xlabel("Важность признака")
+plt.ylabel("Признак")
+plt.title("Top-10 важных признаков (XGBoost)")
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, "xgb_feature_importance_top10.png"))
+plt.close()
+
+xgb_importances_norm = xgb_importances_series / xgb_importances_series.sum()
+
+year_importance = xgb_importances_norm.get("year", 0) * 100
+mileage_importance = xgb_importances_norm.get("mileage", 0) * 100
+total = year_importance + mileage_importance
+
+print(f"\nВАЖНО! Оценка важности признаков по XGBoost:")
+print(f"Год выпуска: {year_importance:.1f}%")
+print(f"Пробег: {mileage_importance:.1f}%")
+print(f"Год + пробег = {total:.1f}% влияния на цену\n")
+
